@@ -154,3 +154,4 @@ Your backend must allow this admin panel origin. In Clarivoice backend, set:
 - `CLIENT_ORIGIN=https://admin-panel-ivory-eight-58.vercel.app,http://localhost:3000`
 
 The existing backend CORS setup already uses `CLIENT_ORIGIN` and credentials mode, so wildcard (`*`) is not required.
+trigger vercel deploy
