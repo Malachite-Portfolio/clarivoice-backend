@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/layout/admin-layout";
 import { RoleGate } from "@/components/layout/role-gate";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { StatCard } from "@/components/ui/stat-card";
@@ -99,25 +100,32 @@ export default function WalletPage() {
       subtitle="Track recharge flow, payment health, and suspicious transaction patterns."
     >
       <RoleGate roles={["super_admin", "admin"]}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Recharge Volume"
-          value={overview ? formatInr(overview.totalRechargeVolume) : "--"}
+      {overviewQuery.isError ? (
+        <EmptyState
+          title="Unable to load wallet overview"
+          description="Wallet overview metrics are currently unavailable."
         />
-        <StatCard
-          label="Pending Payments"
-          value={overview ? String(overview.pendingPayments) : "--"}
-        />
-        <StatCard
-          label="Failed Payments"
-          value={overview ? String(overview.failedPayments) : "--"}
-        />
-        <StatCard
-          label="Refunds"
-          value={overview ? String(overview.refunds) : "--"}
-          subValue={`Coupon Usage: ${overview?.couponUsage ?? "--"}`}
-        />
-      </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Recharge Volume"
+            value={overview ? formatInr(overview.totalRechargeVolume) : "--"}
+          />
+          <StatCard
+            label="Pending Payments"
+            value={overview ? String(overview.pendingPayments) : "--"}
+          />
+          <StatCard
+            label="Failed Payments"
+            value={overview ? String(overview.failedPayments) : "--"}
+          />
+          <StatCard
+            label="Refunds"
+            value={overview ? String(overview.refunds) : "--"}
+            subValue={`Coupon Usage: ${overview?.couponUsage ?? "--"}`}
+          />
+        </div>
+      )}
 
       <SearchFilterBar
         searchValue={search}
@@ -217,6 +225,11 @@ export default function WalletPage() {
         page={transactionsQuery.data?.page}
         totalPages={transactionsQuery.data?.totalPages}
         onPageChange={setPage}
+        emptyLabel={
+          transactionsQuery.isError
+            ? "Unable to load wallet transactions."
+            : "No wallet transactions found."
+        }
       />
       </RoleGate>
     </AdminLayout>

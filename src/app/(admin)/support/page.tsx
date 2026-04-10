@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -120,6 +121,13 @@ export default function SupportPage() {
         ]}
       />
 
+      {ticketsQuery.isError ? (
+        <EmptyState
+          title="Unable to load support tickets"
+          description="Ticket data could not be fetched from the backend."
+        />
+      ) : null}
+
       <DataTable
         data={ticketsQuery.data?.items ?? []}
         columns={columns}
@@ -127,6 +135,11 @@ export default function SupportPage() {
         page={ticketsQuery.data?.page}
         totalPages={ticketsQuery.data?.totalPages}
         onPageChange={setPage}
+        emptyLabel={
+          ticketsQuery.isError
+            ? "Unable to load support tickets."
+            : "No support tickets found."
+        }
       />
 
       {activeTicket ? (

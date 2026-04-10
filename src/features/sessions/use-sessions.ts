@@ -2,19 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { mockLiveSessions } from "@/constants/mock-data";
 import { sessionsService } from "@/services/sessions.service";
 
 export function useLiveSessions() {
   return useQuery({
     queryKey: ["admin-live-sessions"],
-    queryFn: async () => {
-      try {
-        return await sessionsService.getLiveSessions();
-      } catch {
-        return mockLiveSessions;
-      }
-    },
+    queryFn: sessionsService.getLiveSessions,
     refetchInterval: 15_000,
   });
 }

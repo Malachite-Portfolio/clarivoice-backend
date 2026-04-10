@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Tabs } from "@/components/ui/tabs";
@@ -211,6 +212,13 @@ export default function HostsPage() {
 
         {view === "list" ? (
           <>
+            {hostsQuery.isError ? (
+              <EmptyState
+                title="Unable to load hosts"
+                description="Host records are currently unavailable. Please retry."
+              />
+            ) : null}
+
             <SearchFilterBar
               searchValue={search}
               onSearchChange={setSearch}
@@ -316,7 +324,11 @@ export default function HostsPage() {
               page={hostsQuery.data?.page}
               totalPages={hostsQuery.data?.totalPages}
               onPageChange={setPage}
-              emptyLabel="No hosts found for selected filters."
+              emptyLabel={
+                hostsQuery.isError
+                  ? "Unable to load hosts."
+                  : "No hosts found for selected filters."
+              }
             />
           </>
         ) : (

@@ -7,6 +7,7 @@ import { formatDateTime } from "@/utils/date";
 type SessionTableProps = {
   sessions: LiveSession[];
   loading?: boolean;
+  emptyLabel?: string;
   page?: number;
   totalPages?: number;
   onPageChange?: (page: number) => void;
@@ -15,6 +16,7 @@ type SessionTableProps = {
 export function SessionTable({
   sessions,
   loading,
+  emptyLabel,
   page,
   totalPages,
   onPageChange,
@@ -73,7 +75,7 @@ export function SessionTable({
       page={page}
       totalPages={totalPages}
       onPageChange={onPageChange}
-      emptyLabel="No sessions found."
+      emptyLabel={emptyLabel ?? "No sessions found."}
     />
   );
 }

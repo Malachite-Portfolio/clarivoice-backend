@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { mockReferralRecords } from "@/constants/mock-data";
 import { referralsService } from "@/services/referrals.service";
 import type { ReferralSettings } from "@/types";
 
@@ -14,19 +13,7 @@ export function useReferrals(params: {
 }) {
   return useQuery({
     queryKey: ["admin-referrals", params],
-    queryFn: async () => {
-      try {
-        return await referralsService.getReferrals(params);
-      } catch {
-        return {
-          items: mockReferralRecords,
-          page: params.page ?? 1,
-          pageSize: params.pageSize ?? 10,
-          totalCount: mockReferralRecords.length,
-          totalPages: Math.ceil(mockReferralRecords.length / (params.pageSize ?? 10)),
-        };
-      }
-    },
+    queryFn: () => referralsService.getReferrals(params),
   });
 }
 

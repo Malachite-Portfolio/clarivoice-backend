@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
@@ -137,6 +138,13 @@ export default function UsersPage() {
         ]}
       />
 
+      {usersQuery.isError ? (
+        <EmptyState
+          title="Unable to load users"
+          description="User records could not be fetched from the backend."
+        />
+      ) : null}
+
       <DataTable
         data={usersQuery.data?.items ?? []}
         columns={columns}
@@ -144,6 +152,9 @@ export default function UsersPage() {
         page={usersQuery.data?.page}
         totalPages={usersQuery.data?.totalPages}
         onPageChange={setPage}
+        emptyLabel={
+          usersQuery.isError ? "Unable to load users." : "No users found for selected filters."
+        }
       />
 
       {adjustOpen ? (

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AdminLayout } from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SessionTable } from "@/components/ui/session-table";
 import { Tabs } from "@/components/ui/tabs";
 import { useForceEndSession, useLiveSessions } from "@/features/sessions/use-sessions";
@@ -38,7 +39,22 @@ export default function SessionsPage() {
         />
       </div>
 
-      <SessionTable sessions={sessions} loading={liveSessionsQuery.isLoading} />
+      {liveSessionsQuery.isError ? (
+        <EmptyState
+          title="Unable to load live sessions"
+          description="Session data could not be fetched from the backend."
+        />
+      ) : null}
+
+      <SessionTable
+        sessions={sessions}
+        loading={liveSessionsQuery.isLoading}
+        emptyLabel={
+          liveSessionsQuery.isError
+            ? "Unable to load live sessions."
+            : "No live sessions found."
+        }
+      />
 
       <div className="glass-card rounded-2xl border border-app-border p-4">
         <p className="mb-2 text-sm text-app-text-secondary">Quick Intervention</p>

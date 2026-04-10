@@ -12,6 +12,7 @@ import { AdminLayout } from "@/components/layout/admin-layout";
 import { RevenueLineChart } from "@/components/charts/revenue-line-chart";
 import { TopHostsBarChart } from "@/components/charts/top-hosts-bar-chart";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SessionTable } from "@/components/ui/session-table";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,10 @@ export default function DashboardPage() {
     useDashboardData();
 
   const summaryData = summary.data;
+  const revenueData = revenueSeries.data ?? [];
+  const topHostsData = topHosts.data ?? [];
+  const recentSessionData = recentSessions.data ?? [];
+  const recentRechargeData = recentRecharges.data ?? [];
 
   const rechargeColumns: DataColumn<WalletTransaction>[] = [
     {
@@ -56,6 +61,13 @@ export default function DashboardPage() {
       subtitle="Control hosts, monitor revenue, and track active sessions in real-time."
       revenueToday={summaryData?.revenueToday}
     >
+      {summary.isError && !summaryData ? (
+        <EmptyState
+          title="Unable to load dashboard summary"
+          description="Core dashboard metrics are currently unavailable."
+        />
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total Users"
@@ -90,10 +102,34 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 xl:grid-cols-5" id="analytics">
         <div className="xl:col-span-3">
-          <RevenueLineChart data={revenueSeries.data ?? []} />
+          {revenueSeries.isError && revenueData.length === 0 ? (
+            <EmptyState
+              title="Unable to load revenue trend"
+              description="Dashboard analytics service is currently unavailable."
+            />
+          ) : !revenueSeries.isLoading && revenueData.length === 0 ? (
+            <EmptyState
+              title="No revenue trend data"
+              description="Revenue analytics will appear once data is available."
+            />
+          ) : (
+            <RevenueLineChart data={revenueData} />
+          )}
         </div>
         <div className="xl:col-span-2">
-          <TopHostsBarChart data={topHosts.data ?? []} />
+          {topHosts.isError && topHostsData.length === 0 ? (
+            <EmptyState
+              title="Unable to load top hosts"
+              description="Top host earnings data could not be fetched."
+            />
+          ) : !topHosts.isLoading && topHostsData.length === 0 ? (
+            <EmptyState
+              title="No top host data"
+              description="Top earnings data will appear after sessions are billed."
+            />
+          ) : (
+            <TopHostsBarChart data={topHostsData} />
+          )}
         </div>
       </div>
 
@@ -118,15 +154,27 @@ export default function DashboardPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="space-y-3">
           <CardTitle className="text-base">Recent Sessions</CardTitle>
-          <SessionTable sessions={recentSessions.data ?? []} loading={recentSessions.isLoading} />
+          <SessionTable
+            sessions={recentSessionData}
+            loading={recentSessions.isLoading}
+            emptyLabel={
+              recentSessions.isError
+                ? "Unable to load recent sessions."
+                : "No recent sessions found."
+            }
+          />
         </Card>
         <Card className="space-y-3">
           <CardTitle className="text-base">Recent Recharges</CardTitle>
           <DataTable
-            data={recentRecharges.data ?? []}
+            data={recentRechargeData}
             loading={recentRecharges.isLoading}
             columns={rechargeColumns}
-            emptyLabel="No recharge records."
+            emptyLabel={
+              recentRecharges.isError
+                ? "Unable to load recent recharges."
+                : "No recharge records."
+            }
           />
         </Card>
       </div>

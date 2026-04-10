@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { DataTable, type DataColumn } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -18,9 +19,9 @@ export default function ReferralsPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [settings, setSettings] = useState({
-    inviterReward: "55",
-    invitedReward: "50",
-    qualifyingRechargeAmount: "500",
+    inviterReward: "",
+    invitedReward: "",
+    qualifyingRechargeAmount: "",
   });
 
   const referralsQuery = useReferrals({
@@ -141,6 +142,13 @@ export default function ReferralsPage() {
         ]}
       />
 
+      {referralsQuery.isError ? (
+        <EmptyState
+          title="Unable to load referrals"
+          description="Referral records could not be fetched from the backend."
+        />
+      ) : null}
+
       <DataTable
         data={referralsQuery.data?.items ?? []}
         columns={columns}
@@ -148,6 +156,11 @@ export default function ReferralsPage() {
         page={referralsQuery.data?.page}
         totalPages={referralsQuery.data?.totalPages}
         onPageChange={setPage}
+        emptyLabel={
+          referralsQuery.isError
+            ? "Unable to load referral records."
+            : "No referral records found."
+        }
       />
     </AdminLayout>
   );
