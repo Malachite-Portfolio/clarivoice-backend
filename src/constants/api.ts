@@ -67,12 +67,12 @@ export const API_ENDPOINTS = {
     recentRecharges: "/admin/dashboard/recent-recharges",
   },
   hosts: {
-    base: "/admin/hosts",
-    bulkAction: "/admin/hosts/bulk-action",
-    byId: (hostId: string) => `/admin/hosts/${hostId}`,
-    action: (hostId: string, action: string) => `/admin/hosts/${hostId}/${action}`,
-    sessions: (hostId: string) => `/admin/hosts/${hostId}/sessions`,
-    pricingHistory: (hostId: string) => `/admin/hosts/${hostId}/pricing-history`,
+    base: "/admin/listeners",
+    bulkAction: "/admin/listeners/bulk-action",
+    byId: (hostId: string) => `/admin/listeners/${hostId}`,
+    action: (hostId: string, action: string) => `/admin/listeners/${hostId}/${action}`,
+    sessions: (hostId: string) => `/admin/listeners/${hostId}/sessions`,
+    pricingHistory: (hostId: string) => `/admin/listeners/${hostId}/pricing-history`,
   },
   referrals: {
     list: "/admin/referrals",
