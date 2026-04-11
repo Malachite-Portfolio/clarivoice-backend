@@ -17,6 +17,7 @@ import { SessionTable } from "@/components/ui/session-table";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
+import { RECHARGE_FEATURE_ENABLED } from "@/constants/features";
 import { useDashboardData } from "@/features/dashboard/use-dashboard-data";
 import type { WalletTransaction } from "@/types";
 import { formatInr } from "@/utils/currency";
@@ -31,6 +32,9 @@ export default function DashboardPage() {
   const topHostsData = topHosts.data ?? [];
   const recentSessionData = recentSessions.data ?? [];
   const recentRechargeData = recentRecharges.data ?? [];
+  const liveCalls = summaryData?.liveCalls ?? summaryData?.liveCallsNow ?? 0;
+  const liveChats = summaryData?.liveChats ?? summaryData?.liveChatsNow ?? 0;
+  const showRechargeUi = RECHARGE_FEATURE_ENABLED;
 
   const rechargeColumns: DataColumn<WalletTransaction>[] = [
     {
@@ -82,20 +86,30 @@ export default function DashboardPage() {
         />
         <StatCard
           label="Live Calls"
-          value={summaryData ? String(summaryData.liveCallsNow) : "--"}
-          subValue={`Chats: ${summaryData?.liveChatsNow ?? "--"}`}
+          value={summaryData ? String(liveCalls) : "--"}
+          subValue={`Chats: ${summaryData ? String(liveChats) : "--"}`}
           icon={<MessageSquareMore className="h-4 w-4" />}
         />
         <StatCard
           label="Revenue Today"
           value={summaryData ? formatInr(summaryData.revenueToday) : "--"}
-          subValue={`Recharge: ${summaryData ? formatInr(summaryData.rechargeToday) : "--"}`}
+          subValue={
+            showRechargeUi
+              ? `Recharge: ${summaryData ? formatInr(summaryData.rechargeToday) : "--"}`
+              : "Recharge: Coming soon"
+          }
           icon={<CircleDollarSign className="h-4 w-4" />}
         />
         <StatCard
           label="Pending Host Approvals"
           value={summaryData ? String(summaryData.pendingHostApprovals) : "--"}
           icon={<UserSquare className="h-4 w-4" />}
+          className="sm:col-span-2 xl:col-span-1"
+        />
+        <StatCard
+          label="Pending Withdrawals"
+          value={summaryData ? String(summaryData.pendingWithdrawals) : "--"}
+          icon={<Wallet className="h-4 w-4" />}
           className="sm:col-span-2 xl:col-span-1"
         />
       </div>
@@ -109,7 +123,7 @@ export default function DashboardPage() {
             />
           ) : !revenueSeries.isLoading && revenueData.length === 0 ? (
             <EmptyState
-              title="No revenue trend data"
+              title="No data available yet"
               description="Revenue analytics will appear once data is available."
             />
           ) : (
@@ -124,8 +138,8 @@ export default function DashboardPage() {
             />
           ) : !topHosts.isLoading && topHostsData.length === 0 ? (
             <EmptyState
-              title="No top host data"
-              description="Top earnings data will appear after sessions are billed."
+              title="No data available yet"
+              description="Top host earnings will appear after billed sessions are recorded."
             />
           ) : (
             <TopHostsBarChart data={topHostsData} />
@@ -160,31 +174,42 @@ export default function DashboardPage() {
             emptyLabel={
               recentSessions.isError
                 ? "Unable to load recent sessions."
-                : "No recent sessions found."
+                : "No data available yet."
             }
           />
         </Card>
         <Card className="space-y-3">
           <CardTitle className="text-base">Recent Recharges</CardTitle>
-          <DataTable
-            data={recentRechargeData}
-            loading={recentRecharges.isLoading}
-            columns={rechargeColumns}
-            emptyLabel={
-              recentRecharges.isError
-                ? "Unable to load recent recharges."
-                : "No recharge records."
-            }
-          />
+          {showRechargeUi ? (
+            <DataTable
+              data={recentRechargeData}
+              loading={recentRecharges.isLoading}
+              columns={rechargeColumns}
+              emptyLabel={
+                recentRecharges.isError
+                  ? "Unable to load recent recharges."
+                  : "No data available yet."
+              }
+            />
+          ) : (
+            <EmptyState
+              title="Recharge disabled"
+              description="Recharge operations are temporarily disabled in production."
+            />
+          )}
         </Card>
       </div>
 
       <Card className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-app-border p-4">
           <p className="text-xs text-app-text-muted">Wallet Recharge Today</p>
-          <p className="mt-2 text-2xl font-semibold">
-            {summaryData ? formatInr(summaryData.rechargeToday) : "--"}
-          </p>
+          {showRechargeUi ? (
+            <p className="mt-2 text-2xl font-semibold">
+              {summaryData ? formatInr(summaryData.rechargeToday) : "--"}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-app-text-secondary">Coming soon</p>
+          )}
         </div>
         <div className="rounded-2xl border border-app-border p-4">
           <p className="text-xs text-app-text-muted">Revenue Today</p>

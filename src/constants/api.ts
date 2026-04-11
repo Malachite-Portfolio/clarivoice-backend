@@ -79,9 +79,9 @@ export const API_ENDPOINTS = {
     settings: "/admin/referral-settings",
   },
   sessions: {
-    live: "/admin/sessions/live",
-    calls: "/admin/sessions/calls",
-    chats: "/admin/sessions/chats",
+    live: "/admin/sessions/call",
+    calls: "/admin/sessions/call",
+    chats: "/admin/sessions/chat",
     forceEnd: (sessionId: string) => `/admin/sessions/${sessionId}/end`,
   },
   settings: {
@@ -93,15 +93,11 @@ export const API_ENDPOINTS = {
   },
   users: {
     base: "/admin/users",
-    byId: (userId: string) => `/admin/users/${userId}`,
-    creditWallet: (userId: string) => `/admin/users/${userId}/credit-wallet`,
-    debitWallet: (userId: string) => `/admin/users/${userId}/debit-wallet`,
-    suspend: (userId: string) => `/admin/users/${userId}/suspend`,
   },
   wallet: {
-    overview: "/admin/wallet/overview",
-    transactions: "/admin/wallet/transactions",
-    manualAdjustment: "/admin/wallet/manual-adjustment",
+    overview: "/admin/wallet/ledger",
+    transactions: "/admin/wallet/ledger",
+    manualAdjustment: "/admin/wallet/adjust",
   },
   withdrawals: {
     list: "/admin/withdrawals",

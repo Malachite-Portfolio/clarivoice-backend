@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { SearchFilterBar } from "@/components/ui/search-filter-bar";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { RECHARGE_FEATURE_ENABLED } from "@/constants/features";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useManualWalletAdjustment, useWalletOverview, useWalletTransactions } from "@/features/wallet/use-wallet";
 import type { WalletTransaction } from "@/types";
@@ -41,6 +42,7 @@ export default function WalletPage() {
   });
 
   const manualAdjustment = useManualWalletAdjustment();
+  const showRechargeUi = RECHARGE_FEATURE_ENABLED;
 
   const columns: DataColumn<WalletTransaction>[] = useMemo(
     () => [
@@ -97,7 +99,11 @@ export default function WalletPage() {
   return (
     <AdminLayout
       title="Wallet & Payment Management"
-      subtitle="Track recharge flow, payment health, and suspicious transaction patterns."
+      subtitle={
+        showRechargeUi
+          ? "Track recharge flow, payment health, and suspicious transaction patterns."
+          : "Track wallet ledger health and manual adjustments while recharge is disabled."
+      }
     >
       <RoleGate roles={["super_admin", "admin"]}>
       {overviewQuery.isError ? (
@@ -108,7 +114,7 @@ export default function WalletPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
-            label="Recharge Volume"
+            label={showRechargeUi ? "Recharge Volume" : "Wallet Volume"}
             value={overview ? formatInr(overview.totalRechargeVolume) : "--"}
           />
           <StatCard
@@ -141,7 +147,7 @@ export default function WalletPage() {
             value: type,
             options: [
               { value: "all", label: "All" },
-              { value: "recharge", label: "Recharge" },
+              ...(showRechargeUi ? [{ value: "recharge", label: "Recharge" }] : []),
               { value: "call_debit", label: "Call Debit" },
               { value: "chat_debit", label: "Chat Debit" },
               { value: "referral_bonus", label: "Referral Bonus" },

@@ -132,7 +132,7 @@ export default function UsersPage() {
               { value: "all", label: "All" },
               { value: "active", label: "Active" },
               { value: "suspended", label: "Suspended" },
-              { value: "inactive", label: "Inactive" },
+              { value: "blocked", label: "Blocked" },
             ],
           },
         ]}

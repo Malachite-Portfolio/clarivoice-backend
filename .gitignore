@@ -41,3 +41,34 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Clarivoice monorepo ignores
+node_modules/
+.env
+.env.*
+android/app/build/
+android/build/
+android/.gradle/
+android/.cxx/
+android/app/.cxx/
+android/local.properties
+*.apk
+*.keystore
+*.jks
+.codex/
+.codex-logs/
+.expo/
+.expo-*/
+.expo-build-*/
+.gradle-user-home/
+.tmp*/
+_backend_deploy_staging/
+admin-panel/.next/
+admin-panel/.vercel/
+backend_clean/
+dist/
+build/
+*.zip
+*.tar
+*.gz
+*.log

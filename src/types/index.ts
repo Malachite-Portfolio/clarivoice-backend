@@ -335,11 +335,14 @@ export type DashboardSummary = {
   totalUsers: number;
   totalHosts: number;
   activeHosts: number;
-  liveCallsNow: number;
-  liveChatsNow: number;
+  liveCalls: number;
+  liveChats: number;
+  liveCallsNow?: number;
+  liveChatsNow?: number;
   rechargeToday: number;
   revenueToday: number;
   pendingHostApprovals: number;
+  pendingWithdrawals: number;
 };
 
 export type RevenuePoint = {

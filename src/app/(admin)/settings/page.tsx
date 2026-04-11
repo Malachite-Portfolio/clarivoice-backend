@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { PageLoader } from "@/components/ui/loader";
 import { Textarea } from "@/components/ui/textarea";
+import { RECHARGE_FEATURE_ENABLED } from "@/constants/features";
 import { useSettings, useUpdateSettings } from "@/features/settings/use-settings";
 
 export default function SettingsPage() {
@@ -24,6 +25,7 @@ export default function SettingsPage() {
     qualifyingRechargeAmount: "",
     faqContent: "",
   });
+  const showRechargeUi = RECHARGE_FEATURE_ENABLED;
 
   useEffect(() => {
     if (!settingsQuery.data) {
@@ -50,7 +52,11 @@ export default function SettingsPage() {
   return (
     <AdminLayout
       title="Platform Settings"
-      subtitle="Configure recharge plans, referral rewards, billing limits, and feature toggles."
+      subtitle={
+        showRechargeUi
+          ? "Configure recharge plans, referral rewards, billing limits, and feature toggles."
+          : "Configure referral rewards, billing limits, and feature toggles."
+      }
     >
       <RoleGate roles={["super_admin", "admin"]}>
         {settingsQuery.isLoading && !settingsQuery.data ? <PageLoader /> : null}
@@ -98,13 +104,19 @@ export default function SettingsPage() {
                   }
                   placeholder="Low balance warning (mins)"
                 />
-                <Input
-                  value={form.rechargePlans}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, rechargePlans: event.target.value }))
-                  }
-                  placeholder="Recharge plans comma-separated"
-                />
+                {showRechargeUi ? (
+                  <Input
+                    value={form.rechargePlans}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, rechargePlans: event.target.value }))
+                    }
+                    placeholder="Recharge plans comma-separated"
+                  />
+                ) : (
+                  <div className="flex h-11 items-center rounded-xl border border-app-border bg-[#140f26] px-3 text-sm text-app-text-secondary">
+                    Recharge plans are disabled in production
+                  </div>
+                )}
               </div>
             </Card>
 
