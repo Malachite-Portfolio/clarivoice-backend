@@ -70,7 +70,8 @@ export function SettingsScreen({ navigation }: Props) {
       Alert.alert("Saved", "Your preferences have been updated.");
       navigation.goBack();
     } catch (error) {
-      Alert.alert("Could not save", error instanceof Error ? error.message : "Try again.");
+      console.error("[settings] save preferences failed", error);
+      Alert.alert("Could not save", "Could not save settings right now. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -175,6 +176,19 @@ export function SettingsScreen({ navigation }: Props) {
             </Text>
           </SectionCard>
 
+          <SectionCard>
+            <Text style={styles.sectionTitle}>Legal</Text>
+            <Pressable
+              style={styles.policyCard}
+              onPress={() => navigation.navigate("PrivacyPolicy")}
+            >
+              <Text style={styles.policyTitle}>Privacy Policy</Text>
+              <Text style={styles.policyText}>
+                View how we collect, use, and protect your personal data.
+              </Text>
+            </Pressable>
+          </SectionCard>
+
           <Pressable
             style={styles.helpCard}
             onPress={() =>
@@ -251,6 +265,23 @@ const styles = StyleSheet.create({
   permissionStack: {
     marginTop: 12,
     gap: 10,
+  },
+  policyCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceSoft,
+    padding: 12,
+  },
+  policyTitle: {
+    color: colors.textPrimary,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  policyText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
   },
   helpCard: {
     borderRadius: 12,
