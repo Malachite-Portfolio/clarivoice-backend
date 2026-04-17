@@ -81,6 +81,15 @@ export type Host = {
   coverImageUrl?: string;
   availabilitySchedule?: string;
   adminNotes?: string;
+  onboardingCompleted?: boolean;
+  verificationNote?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  onboardingData?: Record<string, unknown>;
+  profileImageRef?: string | null;
+  governmentIdType?: string | null;
+  governmentIdImageRef?: string | null;
 };
 
 export type HostListQuery = {
@@ -285,6 +294,51 @@ export type WithdrawalStatusUpdateResult = {
     lockedWithdrawalBalance: number;
     currency: string;
   };
+};
+
+export type AdminKycStatus = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED";
+export type AdminKycSource = "KYC_VERIFICATION" | "LISTENER_ONBOARDING";
+
+export type AdminKycListItem = {
+  id: string;
+  submissionId: string;
+  userId: string;
+  hostListenerId: string | null;
+  source: AdminKycSource;
+  fullName: string | null;
+  phone: string | null;
+  email: string | null;
+  profilePhotoUrl: string | null;
+  role: string | null;
+  category: string | null;
+  languages: string[];
+  status: AdminKycStatus;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+};
+
+export type AdminKycDetail = AdminKycListItem & {
+  aadhaarLast4: string | null;
+  dob: string | null;
+  reviewNote: string | null;
+  aadhaarFrontUrl: string | null;
+  aadhaarBackUrl: string | null;
+  selfieUrl: string | null;
+  governmentIdUrl: string | null;
+  governmentIdType: string | null;
+  onboardingData: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+  listenerVerificationStatus: string | null;
+  listenerVerificationNote: string | null;
+};
+
+export type AdminKycListResponse = {
+  items: AdminKycListItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 };
 
 export type ReferralRecord = {

@@ -290,7 +290,6 @@ export default function HostsPage() {
                     <option value="suspend">Deactivate Selected</option>
                     <option value="approve">Verify Selected</option>
                     <option value="hide">Hide Selected</option>
-                    <option value="blockSessions">Block Sessions</option>
                   </select>
                   <Button
                     variant="secondary"

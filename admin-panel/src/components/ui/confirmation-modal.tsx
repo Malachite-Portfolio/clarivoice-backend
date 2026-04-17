@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, X } from "lucide-react";
+import { type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 type ConfirmationModalProps = {
@@ -10,6 +11,8 @@ type ConfirmationModalProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   isLoading?: boolean;
+  disableConfirm?: boolean;
+  children?: ReactNode;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -21,6 +24,8 @@ export function ConfirmationModal({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   isLoading,
+  disableConfirm,
+  children,
   onCancel,
   onConfirm,
 }: ConfirmationModalProps) {
@@ -49,11 +54,13 @@ export function ConfirmationModal({
           </button>
         </div>
 
+        {children ? <div className="mb-4">{children}</div> : null}
+
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onCancel} disabled={isLoading}>
             {cancelLabel}
           </Button>
-          <Button onClick={onConfirm} disabled={isLoading}>
+          <Button onClick={onConfirm} disabled={isLoading || disableConfirm}>
             {confirmLabel}
           </Button>
         </div>

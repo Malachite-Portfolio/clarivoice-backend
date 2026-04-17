@@ -36,10 +36,48 @@ export default function HostDetailsPage() {
 
   const [tab, setTab] = useState<DetailsTab>("overview");
   const [pendingAction, setPendingAction] = useState<HostAction | null>(null);
+  const [actionNote, setActionNote] = useState("");
   const [sessionHistory, setSessionHistory] = useState<HostSessionHistoryItem[]>([]);
   const [priceHistory, setPriceHistory] = useState<HostPriceLog[]>([]);
 
   const host = hostQuery.data;
+  const onboardingEntries = useMemo(() => {
+    const source = host?.onboardingData ?? {};
+    if (!source || typeof source !== "object") {
+      return [] as Array<{ key: string; value: string }>;
+    }
+
+    return Object.entries(source)
+      .map(([key, value]) => {
+        if (value === null || value === undefined) {
+          return null;
+        }
+
+        if (Array.isArray(value)) {
+          return {
+            key,
+            value: value
+              .map((item) => String(item).trim())
+              .filter(Boolean)
+              .join(", "),
+          };
+        }
+
+        if (typeof value === "object") {
+          return {
+            key,
+            value: JSON.stringify(value),
+          };
+        }
+
+        return {
+          key,
+          value: String(value),
+        };
+      })
+      .filter((item): item is { key: string; value: string } => Boolean(item && item.value))
+      .slice(0, 20);
+  }, [host?.onboardingData]);
 
   const loadSessionHistory = async () => {
     try {
@@ -162,14 +200,20 @@ export default function HostDetailsPage() {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
-            onClick={() => setPendingAction(host.verificationStatus === "verified" ? "reject" : "approve")}
+            onClick={() => {
+              setActionNote("");
+              setPendingAction(host.verificationStatus === "verified" ? "reject" : "approve");
+            }}
           >
             <ShieldCheck className="h-4 w-4" />
             {host.verificationStatus === "verified" ? "Reject" : "Approve"}
           </Button>
           <Button
             variant="secondary"
-            onClick={() => setPendingAction(host.status === "suspended" ? "reactivate" : "suspend")}
+            onClick={() => {
+              setActionNote("");
+              setPendingAction(host.status === "suspended" ? "reactivate" : "suspend");
+            }}
           >
             <ShieldAlert className="h-4 w-4" />
             {host.status === "suspended" ? "Reactivate" : "Suspend"}
@@ -177,7 +221,10 @@ export default function HostDetailsPage() {
           <Button
             variant="secondary"
             onClick={() =>
-              setPendingAction(host.visibility === "visible" ? "hide" : "show")
+              {
+                setActionNote("");
+                setPendingAction(host.visibility === "visible" ? "hide" : "show");
+              }
             }
           >
             {host.visibility === "visible" ? (
@@ -227,6 +274,15 @@ export default function HostDetailsPage() {
                 <div className="mt-2">
                   <StatusBadge status={host.verificationStatus} />
                 </div>
+                <p className="mt-2 text-xs text-app-text-muted">
+                  Submitted: {host.submittedAt ? formatDateTime(host.submittedAt) : "-"}
+                </p>
+                <p className="mt-1 text-xs text-app-text-muted">
+                  Reviewed: {host.reviewedAt ? formatDateTime(host.reviewedAt) : "-"}
+                </p>
+                {host.verificationNote ? (
+                  <p className="mt-2 text-xs text-rose-300">Note: {host.verificationNote}</p>
+                ) : null}
               </div>
               <div className="rounded-xl border border-app-border p-3">
                 <p className="text-xs text-app-text-muted">Current Presence</p>
@@ -236,32 +292,90 @@ export default function HostDetailsPage() {
               </div>
             </div>
 
+            <div className="rounded-xl border border-app-border p-3">
+              <p className="text-sm font-semibold text-app-text-primary">Onboarding Details</p>
+              {onboardingEntries.length === 0 ? (
+                <p className="mt-2 text-xs text-app-text-muted">No onboarding data submitted yet.</p>
+              ) : (
+                <div className="mt-3 grid gap-2">
+                  {onboardingEntries.map((item) => (
+                    <div key={item.key} className="rounded-lg border border-app-border/70 p-2">
+                      <p className="text-[11px] uppercase tracking-wide text-app-text-muted">
+                        {item.key}
+                      </p>
+                      <p className="mt-1 text-sm text-app-text-primary">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border border-app-border/70 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-app-text-muted">
+                    Profile Image
+                  </p>
+                  {host.profileImageRef ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={host.profileImageRef}
+                        alt="Listener profile"
+                        className="mt-2 h-40 w-full rounded-lg object-cover"
+                      />
+                      <a
+                        className="mt-2 inline-flex text-xs text-app-accent underline"
+                        href={host.profileImageRef}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open original
+                      </a>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-xs text-app-text-muted">Not uploaded</p>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-app-border/70 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-app-text-muted">
+                    Government ID
+                  </p>
+                  <p className="mt-1 text-xs text-app-text-secondary">
+                    Type: {host.governmentIdType || "-"}
+                  </p>
+                  {host.governmentIdImageRef ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={host.governmentIdImageRef}
+                        alt="Government ID"
+                        className="mt-2 h-40 w-full rounded-lg object-cover"
+                      />
+                      <a
+                        className="mt-2 inline-flex text-xs text-app-accent underline"
+                        href={host.governmentIdImageRef}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open original
+                      </a>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-xs text-app-text-muted">Not uploaded</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="grid gap-2">
               <Button
                 variant="secondary"
-                onClick={() => setPendingAction("forceOffline")}
+                onClick={() => {
+                  setActionNote("");
+                  setPendingAction("forceOffline");
+                }}
               >
                 Force Offline
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setPendingAction("resetPassword")}
-              >
-                Reset Password
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  setPendingAction(host.blockedNewSessions ? "allowSessions" : "blockSessions")
-                }
-              >
-                {host.blockedNewSessions ? "Allow New Sessions" : "Block New Sessions"}
-              </Button>
-              <Button
-                variant={host.featured ? "danger" : "secondary"}
-                onClick={() => setPendingAction(host.featured ? "unfeature" : "feature")}
-              >
-                {host.featured ? "Unmark Featured" : "Mark Featured"}
               </Button>
             </div>
           </Card>
@@ -288,21 +402,48 @@ export default function HostDetailsPage() {
         open={Boolean(pendingAction)}
         title="Confirm Host Action"
         description={`Are you sure you want to ${pendingAction} this host?`}
-        onCancel={() => setPendingAction(null)}
+        confirmLabel={pendingAction === "reject" ? "Reject Listener" : "Confirm"}
+        onCancel={() => {
+          setActionNote("");
+          setPendingAction(null);
+        }}
         isLoading={actionMutation.isPending}
         onConfirm={async () => {
           if (!pendingAction) {
             return;
           }
+          if (pendingAction === "reject" && !actionNote.trim()) {
+            toast.error("Rejection reason is required");
+            return;
+          }
           try {
-            await actionMutation.mutateAsync({ action: pendingAction });
+            await actionMutation.mutateAsync({
+              action: pendingAction,
+              payload:
+                pendingAction === "reject" || pendingAction === "approve"
+                  ? { note: actionNote.trim() }
+                  : undefined,
+            });
             toast.success("Host status updated");
+            setActionNote("");
             setPendingAction(null);
           } catch {
             toast.error("Unable to perform this action");
           }
         }}
-      />
+      >
+        {pendingAction === "reject" ? (
+          <div className="space-y-2">
+            <p className="text-xs text-app-text-secondary">Rejection reason (required)</p>
+            <textarea
+              value={actionNote}
+              onChange={(event) => setActionNote(event.target.value)}
+              className="min-h-[84px] w-full rounded-xl border border-app-border bg-[#120e21] px-3 py-2 text-sm text-app-text-primary outline-none focus:border-app-accent"
+              placeholder="Add a reason for rejection"
+            />
+          </div>
+        ) : null}
+      </ConfirmationModal>
       </RoleGate>
     </AdminLayout>
   );

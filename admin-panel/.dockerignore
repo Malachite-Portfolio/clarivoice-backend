@@ -1,0 +1,11 @@
+node_modules
+.next
+npm-debug.log*
+.env
+.env.*
+!.env.production
+admin-panel-dev.log
+.vercel
+.git
+.gitignore
+README.md

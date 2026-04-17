@@ -100,8 +100,8 @@ const mapCallSession = (item: BackendCallSession): LiveSession => {
   return {
     id: item.id,
     type: "call",
-    userName: item.user?.displayName || item.user?.phone || "Unknown User",
-    hostName: item.listener?.displayName || item.listener?.phone || "Unknown Host",
+    userName: item.user?.displayName || item.user?.phone || item.user?.id || "-",
+    hostName: item.listener?.displayName || item.listener?.phone || item.listener?.id || "-",
     startTime,
     runningDurationSeconds: computeDurationSeconds(startTime, item.endedAt),
     currentBilling: toNumber(item.totalAmount, 0),
@@ -114,8 +114,8 @@ const mapChatSession = (item: BackendChatSession): LiveSession => {
   return {
     id: item.id,
     type: "chat",
-    userName: item.user?.displayName || item.user?.phone || "Unknown User",
-    hostName: item.listener?.displayName || item.listener?.phone || "Unknown Host",
+    userName: item.user?.displayName || item.user?.phone || item.user?.id || "-",
+    hostName: item.listener?.displayName || item.listener?.phone || item.listener?.id || "-",
     startTime,
     runningDurationSeconds: computeDurationSeconds(startTime, item.endedAt),
     currentBilling: toNumber(item.totalAmount, 0),

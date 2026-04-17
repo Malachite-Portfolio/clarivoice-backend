@@ -68,11 +68,20 @@ export const API_ENDPOINTS = {
   },
   hosts: {
     base: "/admin/listeners",
+    pending: "/admin/listeners/pending",
     bulkAction: "/admin/listeners/bulk-action",
     byId: (hostId: string) => `/admin/listeners/${hostId}`,
+    approve: (hostId: string) => `/admin/listeners/${hostId}/approve`,
+    reject: (hostId: string) => `/admin/listeners/${hostId}/reject`,
     action: (hostId: string, action: string) => `/admin/listeners/${hostId}/${action}`,
     sessions: (hostId: string) => `/admin/listeners/${hostId}/sessions`,
     pricingHistory: (hostId: string) => `/admin/listeners/${hostId}/pricing-history`,
+  },
+  kyc: {
+    list: "/admin/kyc",
+    byId: (kycId: string) => `/admin/kyc/${kycId}`,
+    approve: (kycId: string) => `/admin/kyc/${kycId}/approve`,
+    reject: (kycId: string) => `/admin/kyc/${kycId}/reject`,
   },
   referrals: {
     list: "/admin/referrals",

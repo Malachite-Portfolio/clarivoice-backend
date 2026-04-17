@@ -2,6 +2,7 @@ import {
   BadgeDollarSign,
   ChartArea,
   CircleDollarSign,
+  FileCheck2,
   Headset,
   Landmark,
   LayoutDashboard,
@@ -50,6 +51,18 @@ export const SIDEBAR_NAV_ITEMS: NavItem[] = [
     label: "Withdrawals",
     href: "/withdrawals",
     icon: Landmark,
+    roles: ["super_admin", "admin"],
+  },
+  {
+    label: "KYC Reviews",
+    href: "/kyc",
+    icon: FileCheck2,
+    roles: ["super_admin", "admin"],
+  },
+  {
+    label: "Host KYC Review",
+    href: "/host-kyc",
+    icon: FileCheck2,
     roles: ["super_admin", "admin"],
   },
   {

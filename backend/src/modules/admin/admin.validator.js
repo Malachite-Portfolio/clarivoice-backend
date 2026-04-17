@@ -5,6 +5,67 @@ const adminPaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(20),
 });
 
+const adminUsersQuerySchema = adminPaginationSchema.extend({
+  search: z.string().trim().max(120).optional(),
+  status: z.enum(['ALL', 'ACTIVE', 'BLOCKED', 'DELETED']).optional().default('ALL'),
+});
+
+const adminListenersPendingQuerySchema = adminPaginationSchema.extend({
+  search: z.string().trim().max(120).optional(),
+});
+
+const adminListenerIdParamSchema = z.object({
+  id: z.string().min(10),
+});
+
+const adminKycListQuerySchema = adminPaginationSchema.extend({
+  status: z
+    .enum(['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'ALL'])
+    .default('ALL')
+    .optional(),
+  source: z
+    .enum(['KYC_VERIFICATION', 'LISTENER_ONBOARDING', 'ALL'])
+    .default('ALL')
+    .optional(),
+  role: z
+    .enum(['LISTENER', 'USER', 'ADMIN', 'ALL'])
+    .default('ALL')
+    .optional(),
+  search: z.string().trim().max(120).optional(),
+});
+
+const adminKycIdParamSchema = z.object({
+  id: z.string().min(10),
+});
+
+const approveListenerApplicationSchema = z.object({
+  note: z.string().trim().max(500).optional(),
+});
+
+const rejectListenerApplicationSchema = z.object({
+  note: z
+    .string()
+    .trim()
+    .min(3, 'Rejection reason is required')
+    .max(500, 'Rejection reason cannot exceed 500 characters'),
+});
+
+const approveKycSchema = z
+  .object({
+    reviewNote: z.string().trim().max(500).optional(),
+  })
+  .strict();
+
+const rejectKycSchema = z
+  .object({
+    reviewNote: z
+      .string()
+      .trim()
+      .min(3, 'Rejection reason is required')
+      .max(500, 'Rejection reason cannot exceed 500 characters'),
+  })
+  .strict();
+
 const updateListenerRatesSchema = z.object({
   callRatePerMinute: z.coerce.number().positive(),
   chatRatePerMinute: z.coerce.number().positive(),
@@ -54,6 +115,15 @@ const updateReferralRuleSchema = z.object({
 
 module.exports = {
   adminPaginationSchema,
+  adminUsersQuerySchema,
+  adminKycListQuerySchema,
+  adminKycIdParamSchema,
+  adminListenersPendingQuerySchema,
+  adminListenerIdParamSchema,
+  approveKycSchema,
+  rejectKycSchema,
+  approveListenerApplicationSchema,
+  rejectListenerApplicationSchema,
   updateListenerRatesSchema,
   updateListenerStatusSchema,
   updateListenerVisibilitySchema,

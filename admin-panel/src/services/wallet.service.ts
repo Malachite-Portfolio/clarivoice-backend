@@ -85,7 +85,7 @@ const mapWalletRow = (item: BackendWalletRow): WalletTransaction => {
 
   return {
     id: item.id,
-    userName: item.user?.displayName || item.user?.phone || "Unknown User",
+    userName: item.user?.displayName || item.user?.phone || item.userId || "-",
     userId: item.user?.id || item.userId,
     type: mapTransactionType(item.type),
     amount: toNumber(item.amount, 0),

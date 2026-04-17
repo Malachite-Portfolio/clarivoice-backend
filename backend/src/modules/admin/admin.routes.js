@@ -5,6 +5,15 @@ const { validate } = require('../../middleware/validate');
 const controller = require('./admin.controller');
 const {
   adminPaginationSchema,
+  adminUsersQuerySchema,
+  adminKycListQuerySchema,
+  adminKycIdParamSchema,
+  adminListenersPendingQuerySchema,
+  adminListenerIdParamSchema,
+  approveKycSchema,
+  rejectKycSchema,
+  approveListenerApplicationSchema,
+  rejectListenerApplicationSchema,
   updateListenerRatesSchema,
   updateListenerStatusSchema,
   updateListenerVisibilitySchema,
@@ -19,8 +28,44 @@ const router = express.Router();
 
 router.use(authMiddleware, allowRoles('ADMIN'));
 
-router.get('/users', validate(adminPaginationSchema, 'query'), controller.listUsers);
+router.get('/dashboard/summary', controller.getDashboardSummary);
+router.get('/dashboard/revenue-series', controller.getDashboardRevenueSeries);
+router.get('/dashboard/top-hosts', controller.getDashboardTopHosts);
+router.get('/dashboard/recent-sessions', controller.getDashboardRecentSessions);
+router.get('/dashboard/recent-recharges', controller.getDashboardRecentRecharges);
+
+router.get('/users', validate(adminUsersQuerySchema, 'query'), controller.listUsers);
 router.get('/listeners', validate(adminPaginationSchema, 'query'), controller.listListeners);
+router.get('/listeners/pending', validate(adminListenersPendingQuerySchema, 'query'), controller.listPendingListeners);
+router.get('/listeners/:id', validate(adminListenerIdParamSchema, 'params'), controller.getListenerById);
+
+router.get('/kyc', validate(adminKycListQuerySchema, 'query'), controller.listKycSubmissions);
+router.get('/kyc/:id', validate(adminKycIdParamSchema, 'params'), controller.getKycSubmissionById);
+router.post(
+  '/kyc/:id/approve',
+  validate(adminKycIdParamSchema, 'params'),
+  validate(approveKycSchema),
+  controller.approveKycSubmission
+);
+router.post(
+  '/kyc/:id/reject',
+  validate(adminKycIdParamSchema, 'params'),
+  validate(rejectKycSchema),
+  controller.rejectKycSubmission
+);
+
+router.patch(
+  '/listeners/:id/approve',
+  validate(adminListenerIdParamSchema, 'params'),
+  validate(approveListenerApplicationSchema),
+  controller.approveListenerApplication
+);
+router.patch(
+  '/listeners/:id/reject',
+  validate(adminListenerIdParamSchema, 'params'),
+  validate(rejectListenerApplicationSchema),
+  controller.rejectListenerApplication
+);
 router.patch('/listeners/:id/rates', validate(updateListenerRatesSchema), controller.updateListenerRates);
 router.patch('/listeners/:id/status', validate(updateListenerStatusSchema), controller.updateListenerStatus);
 router.patch('/listeners/:id/visibility', validate(updateListenerVisibilitySchema), controller.updateListenerVisibility);

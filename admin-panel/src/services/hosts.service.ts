@@ -1,4 +1,4 @@
-import { API_ENDPOINTS } from "@/constants/api";
+import { API_BASE_URL, API_ENDPOINTS } from "@/constants/api";
 import { api } from "@/services/http";
 import type {
   ApiResponse,
@@ -24,6 +24,16 @@ type ListenerListItem = {
   availability?: string | null;
   isEnabled?: boolean | null;
   totalSessions?: number | null;
+  onboardingCompleted?: boolean | null;
+  verificationStatus?: string | null;
+  verificationNote?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  onboardingData?: Record<string, unknown> | null;
+  profileImageRef?: string | null;
+  governmentIdType?: string | null;
+  governmentIdImageRef?: string | null;
   createdAt?: string;
   updatedAt?: string;
   user?: {
@@ -31,6 +41,7 @@ type ListenerListItem = {
     phone?: string | null;
     email?: string | null;
     displayName?: string | null;
+    profileImageUrl?: string | null;
     status?: string | null;
     isPhoneVerified?: boolean | null;
     createdAt?: string;
@@ -47,9 +58,46 @@ type ListenerListResponse = {
   };
 };
 
+type ListenerApplicationResponse = ListenerListItem & {
+  listener?: {
+    id?: string;
+    phone?: string | null;
+    email?: string | null;
+    displayName?: string | null;
+    profileImageUrl?: string | null;
+    status?: string | null;
+    isPhoneVerified?: boolean | null;
+    createdAt?: string;
+  } | null;
+  rates?: {
+    callRatePerMinute?: number | string | null;
+    chatRatePerMinute?: number | string | null;
+  } | null;
+};
+
 const toNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const getApiRoot = () => API_BASE_URL.replace(/\/api(?:\/v\d+)?$/i, "");
+
+const toMediaUrl = (value?: string | null) => {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized;
+  }
+
+  if (normalized.startsWith("/")) {
+    const root = getApiRoot();
+    return root ? `${root}${normalized}` : normalized;
+  }
+
+  return normalized;
 };
 
 const mapHostStatus = (userStatus?: string | null, isEnabled?: boolean | null) => {
@@ -74,18 +122,48 @@ const mapPresence = (availability?: string | null) => {
   return "offline" as const;
 };
 
-const mapVerificationStatus = (isPhoneVerified?: boolean | null) =>
-  isPhoneVerified ? ("verified" as const) : ("pending" as const);
+const mapVerificationStatus = (
+  verificationStatus?: string | null,
+  isPhoneVerified?: boolean | null,
+) => {
+  const normalized = String(verificationStatus ?? "").toUpperCase();
 
-const mapListenerToHost = (item: ListenerListItem): Host => {
-  const displayName = item.user?.displayName || "Anonymous Host";
-  const phone = item.user?.phone || "N/A";
-  const email = item.user?.email || "N/A";
+  if (normalized === "APPROVED") {
+    return "verified" as const;
+  }
+
+  if (normalized === "REJECTED") {
+    return "rejected" as const;
+  }
+
+  if (normalized === "PENDING_VERIFICATION") {
+    return "pending" as const;
+  }
+
+  return isPhoneVerified ? ("verified" as const) : ("pending" as const);
+};
+
+const mapListenerToHost = (item: ListenerListItem | ListenerApplicationResponse): Host => {
+  const listenerUser = "listener" in item && item.listener ? item.listener : item.user;
+  const displayName =
+    listenerUser?.displayName ||
+    item.user?.displayName ||
+    listenerUser?.phone ||
+    item.user?.phone ||
+    item.userId ||
+    item.id;
+  const phone = listenerUser?.phone || item.user?.phone || "-";
+  const email = listenerUser?.email || item.user?.email || "-";
   const joinedAt =
-    item.user?.createdAt || item.createdAt || item.updatedAt || new Date().toISOString();
+    listenerUser?.createdAt || item.user?.createdAt || item.createdAt || item.updatedAt || "";
   const experienceYears = toNumber(item.experienceYears, 0);
   const rating = toNumber(item.rating, 0);
   const totalSessions = toNumber(item.totalSessions, 0);
+  const userStatus = listenerUser?.status || item.user?.status;
+  const callRatePerMinute =
+    "rates" in item && item.rates ? toNumber(item.rates.callRatePerMinute, 0) : toNumber(item.callRatePerMinute, 0);
+  const chatRatePerMinute =
+    "rates" in item && item.rates ? toNumber(item.rates.chatRatePerMinute, 0) : toNumber(item.chatRatePerMinute, 0);
 
   return {
     id: item.userId || item.user?.id || item.id,
@@ -96,7 +174,7 @@ const mapListenerToHost = (item: ListenerListItem): Host => {
     email,
     gender: "other",
     age: 0,
-    category: item.category || "General",
+    category: item.category || "-",
     languages: Array.isArray(item.languages) ? item.languages : [],
     experienceYears,
     rating,
@@ -104,8 +182,8 @@ const mapListenerToHost = (item: ListenerListItem): Host => {
     quote: item.bio || "",
     bio: item.bio || "",
     skills: [],
-    callRatePerMinute: toNumber(item.callRatePerMinute, 0),
-    chatRatePerMinute: toNumber(item.chatRatePerMinute, 0),
+    callRatePerMinute,
+    chatRatePerMinute,
     minChatBalance: 0,
     minCallBalance: 0,
     totalCalls: 0,
@@ -116,17 +194,26 @@ const mapListenerToHost = (item: ListenerListItem): Host => {
     revenueGenerated: 0,
     hostEarnings: 0,
     platformCommission: 0,
-    status: mapHostStatus(item.user?.status, item.isEnabled),
-    verificationStatus: mapVerificationStatus(item.user?.isPhoneVerified),
+    status: mapHostStatus(userStatus, item.isEnabled),
+    verificationStatus: mapVerificationStatus(item.verificationStatus, listenerUser?.isPhoneVerified ?? item.user?.isPhoneVerified),
     visibility: item.isEnabled ? "visible" : "hidden",
     presence: mapPresence(item.availability),
     featured: false,
     blockedNewSessions: false,
     joinedAt,
-    profileImageUrl: undefined,
+    profileImageUrl: toMediaUrl(listenerUser?.profileImageUrl || item.user?.profileImageUrl) || undefined,
     coverImageUrl: undefined,
     availabilitySchedule: undefined,
     adminNotes: undefined,
+    onboardingCompleted: Boolean(item.onboardingCompleted),
+    verificationNote: item.verificationNote ?? null,
+    submittedAt: item.submittedAt ?? null,
+    reviewedAt: item.reviewedAt ?? null,
+    reviewedBy: item.reviewedBy ?? null,
+    onboardingData: item.onboardingData ?? {},
+    profileImageRef: toMediaUrl(item.profileImageRef),
+    governmentIdType: item.governmentIdType ?? null,
+    governmentIdImageRef: toMediaUrl(item.governmentIdImageRef),
   };
 };
 
@@ -138,25 +225,21 @@ const buildListenerListParams = (query: HostListQuery = {}) => ({
 });
 
 const getHostByIdFromList = async (hostId: string) => {
-  const response = await hostsService.getHosts({
-    page: 1,
-    pageSize: 100,
-  });
-
-  const host = response.items.find((item) => item.id === hostId || item.hostId === hostId);
-  if (!host) {
-    throw new Error("Host not found");
-  }
-
-  return host;
+  const response = await api.get<ApiResponse<ListenerApplicationResponse>>(
+    API_ENDPOINTS.hosts.byId(hostId),
+  );
+  return mapListenerToHost(response.data.data);
 };
 
 export const hostsService = {
   async getHosts(query: HostListQuery = {}) {
     const params = buildListenerListParams(query);
+    const verifiedFilter = query.verified ?? "all";
+    const endpoint =
+      verifiedFilter === "pending" ? API_ENDPOINTS.hosts.pending : API_ENDPOINTS.hosts.base;
 
     const response = await api.get<ApiResponse<ListenerListResponse>>(
-      API_ENDPOINTS.hosts.base,
+      endpoint,
       {
         params,
       },
@@ -225,16 +308,27 @@ export const hostsService = {
   },
 
   async updateHostAction(hostId: string, action: HostAction, payload?: unknown) {
-    void payload;
-
     if (action === "approve") {
-      await api.patch(API_ENDPOINTS.hosts.byId(`${hostId}/status`), {
-        userStatus: "ACTIVE",
+      await api.patch(API_ENDPOINTS.hosts.approve(hostId), {
+        note:
+          payload && typeof payload === "object" && "note" in payload
+            ? (payload as { note?: unknown }).note
+            : undefined,
       });
       return getHostByIdFromList(hostId);
     }
 
-    if (action === "reject" || action === "suspend") {
+    if (action === "reject") {
+      await api.patch(API_ENDPOINTS.hosts.reject(hostId), {
+        note:
+          payload && typeof payload === "object" && "note" in payload
+            ? (payload as { note?: unknown }).note
+            : "",
+      });
+      return getHostByIdFromList(hostId);
+    }
+
+    if (action === "suspend") {
       await api.patch(API_ENDPOINTS.hosts.byId(`${hostId}/status`), {
         userStatus: "BLOCKED",
         isEnabled: false,

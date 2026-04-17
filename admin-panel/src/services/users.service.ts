@@ -66,15 +66,15 @@ const normalizeStatusFilter = (status?: string) => {
 
 const mapBackendUser = (item: BackendUserRecord): User => ({
   id: item.id,
-  name: item.displayName || item.phone || "Unknown User",
-  phone: item.phone || "N/A",
+  name: item.displayName || item.phone || item.id,
+  phone: item.phone || "-",
   email: item.email || undefined,
   referralCode: item.referralCode || "-",
   walletBalance: toNumber(item.wallet?.balance, 0),
   totalRecharge: toNumber(item.totalRecharge, 0),
   totalSpent: toNumber(item.totalSpent, 0),
   status: mapUserStatus(item.status),
-  joinedAt: item.createdAt || new Date().toISOString(),
+  joinedAt: item.createdAt || "",
 });
 
 export const usersService = {

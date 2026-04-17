@@ -35,6 +35,8 @@ export default function UsersPage() {
   });
 
   const walletAdjustment = useWalletAdjustment();
+  const usersErrorMessage =
+    usersQuery.error instanceof Error ? usersQuery.error.message : "Unknown error";
 
   const columns: DataColumn<User>[] = useMemo(
     () => [
@@ -139,10 +141,22 @@ export default function UsersPage() {
       />
 
       {usersQuery.isError ? (
-        <EmptyState
-          title="Unable to load users"
-          description="User records could not be fetched from the backend."
-        />
+        <Card className="space-y-3 p-4">
+          <EmptyState
+            title="Unable to load users"
+            description="User records could not be fetched from the backend."
+          />
+          <div className="flex items-center justify-center gap-2">
+            <Button variant="secondary" onClick={() => usersQuery.refetch()}>
+              Retry
+            </Button>
+          </div>
+          {process.env.NODE_ENV !== "production" ? (
+            <p className="text-center text-xs text-app-text-muted">
+              Diagnostic: {usersErrorMessage}
+            </p>
+          ) : null}
+        </Card>
       ) : null}
 
       <DataTable
