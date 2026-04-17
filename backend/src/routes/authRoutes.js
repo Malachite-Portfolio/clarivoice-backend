@@ -3,6 +3,7 @@ const moduleAuthRoutes = require('../modules/auth/auth.routes');
 const authService = require('../modules/auth/auth.service');
 const { firebaseLogin } = require('../controllers/firebaseLoginController');
 const { logger } = require('../config/logger');
+const { toSafePrismaClientError } = require('../utils/prismaError');
 
 const maskIdentity = (value) => {
   const input = String(value || '').trim();
@@ -61,15 +62,20 @@ const loginUserCompat = async (req, res) => {
       data,
     });
   } catch (error) {
+    const safePrismaError = toSafePrismaClientError(error);
+    const statusCode = safePrismaError?.statusCode || error?.statusCode || 500;
+    const code = safePrismaError?.code || error?.code || 'LOGIN_FAILED';
+    const message = safePrismaError?.message || error?.message || 'Login failed';
+
     logger.warn('[AuthCompat] login-user failed', {
-      code: error?.code || 'LOGIN_FAILED',
-      statusCode: error?.statusCode || 500,
-      message: error?.message || 'Login failed',
+      code,
+      statusCode,
+      message,
     });
-    return res.status(error?.statusCode || 500).json({
+    return res.status(statusCode).json({
       success: false,
-      code: error?.code || 'LOGIN_FAILED',
-      message: error?.message || 'Login failed',
+      code,
+      message,
     });
   }
 };
@@ -154,15 +160,21 @@ router.post('/login-listener', async (req, res) => {
       data,
     });
   } catch (error) {
+    const safePrismaError = toSafePrismaClientError(error);
+    const statusCode = safePrismaError?.statusCode || error?.statusCode || 500;
+    const code = safePrismaError?.code || error?.code || 'LISTENER_LOGIN_FAILED';
+    const message =
+      safePrismaError?.message || error?.message || 'Listener login failed';
+
     logger.warn('[AuthCompat] login-listener failed', {
-      code: error?.code || 'LISTENER_LOGIN_FAILED',
-      statusCode: error?.statusCode || 500,
-      message: error?.message || 'Listener login failed',
+      code,
+      statusCode,
+      message,
     });
-    return res.status(error?.statusCode || 500).json({
+    return res.status(statusCode).json({
       success: false,
-      code: error?.code || 'LISTENER_LOGIN_FAILED',
-      message: error?.message || 'Listener login failed',
+      code,
+      message,
     });
   }
 });

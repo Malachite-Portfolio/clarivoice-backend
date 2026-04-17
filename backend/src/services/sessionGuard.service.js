@@ -92,11 +92,33 @@ const getListenerProfile = async (listenerId) => {
   return listener;
 };
 
+const assertListenerHasNotBlockedUser = async ({ listenerId, userId }) => {
+  const blocked = await prisma.listenerBlockedUser.findUnique({
+    where: {
+      listenerId_userId: {
+        listenerId,
+        userId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (blocked) {
+    throw new AppError('You are blocked by this host', 403, 'HOST_BLOCKED_USER', {
+      listenerId,
+      userId,
+    });
+  }
+};
+
 const checkCanStartSession = async ({ userId, listenerId, mode, actorId = userId }) => {
   await privacyModerationService.assertNotSuspended({
     userId: actorId,
     action: mode === 'chat' ? 'START_CHAT' : 'START_CALL',
   });
+  await assertListenerHasNotBlockedUser({ listenerId, userId });
 
   const rules = await getBillingRules();
   const listener = await getListenerProfile(listenerId);
@@ -157,6 +179,7 @@ const canStartCall = ({ userId, listenerId, actorId }) =>
 
 module.exports = {
   getBillingRules,
+  assertListenerHasNotBlockedUser,
   canStartChat,
   canStartCall,
 };

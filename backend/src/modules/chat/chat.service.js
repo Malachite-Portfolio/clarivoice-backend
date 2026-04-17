@@ -1,6 +1,7 @@
 const { prisma } = require('../../config/prisma');
 const { logger } = require('../../config/logger');
 const { AppError } = require('../../utils/appError');
+const { DEMO_ACCOUNT_PHONE_VALUES } = require('../../utils/demoAccounts');
 const sessionGuardService = require('../../services/sessionGuard.service');
 const privacyModerationService = require('../../services/privacyModeration.service');
 const pushNotificationService = require('../../services/pushNotification.service');
@@ -40,9 +41,29 @@ const assertChatParticipant = (session, userId) => {
 };
 
 const setListenerOnline = async (listenerId, reason) => {
+  const listenerState = await prisma.listenerProfile.findUnique({
+    where: { userId: listenerId },
+    select: {
+      user: {
+        select: {
+          kycVerification: {
+            select: {
+              status: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const normalizedKycStatus = String(listenerState?.user?.kycVerification?.status || '')
+    .trim()
+    .toUpperCase();
+  const nextAvailability = normalizedKycStatus === 'APPROVED' ? 'ONLINE' : 'OFFLINE';
+
   await prisma.listenerProfile.updateMany({
     where: { userId: listenerId },
-    data: { availability: 'ONLINE' },
+    data: { availability: nextAvailability },
   });
 
   const listenerProfile = await prisma.listenerProfile.findUnique({
@@ -52,11 +73,11 @@ const setListenerOnline = async (listenerId, reason) => {
 
   emitHostStatusChanged({
     listenerId,
-    status: listenerProfile?.availability || 'ONLINE',
-    availability: listenerProfile?.availability || 'ONLINE',
+    status: listenerProfile?.availability || nextAvailability,
+    availability: listenerProfile?.availability || nextAvailability,
     isEnabled: listenerProfile?.isEnabled ?? true,
     updatedAt: listenerProfile?.updatedAt || null,
-    reason,
+    reason: nextAvailability === 'ONLINE' ? reason : 'KYC_APPROVAL_REQUIRED',
   });
 };
 
@@ -435,6 +456,21 @@ const listChatSessions = async ({ userId, role, page, limit, status }) => {
   const where = {
     ...(status ? { status } : {}),
     ...(role === 'LISTENER' ? { listenerId: userId } : { userId }),
+    ...(role === 'LISTENER'
+      ? {
+          user: {
+            phone: {
+              notIn: DEMO_ACCOUNT_PHONE_VALUES,
+            },
+          },
+        }
+      : {
+          listener: {
+            phone: {
+              notIn: DEMO_ACCOUNT_PHONE_VALUES,
+            },
+          },
+        }),
   };
 
   const [items, total] = await Promise.all([
@@ -539,6 +575,10 @@ const sendMessage = async ({ sessionId, senderId, receiverId, messageType = 'tex
   }
 
   assertChatParticipant(session, senderId);
+  await sessionGuardService.assertListenerHasNotBlockedUser({
+    listenerId: session.listenerId,
+    userId: session.userId,
+  });
 
   // Contract: chat should not require an accept/reject handshake.
   // If legacy sessions still exist in REQUESTED state, auto-activate on first message.
@@ -722,16 +762,34 @@ const markRead = async ({ sessionId, readerId, messageIds }) => {
     },
   });
 
+  const unreadCount = await prisma.chatMessage.count({
+    where: {
+      sessionId,
+      receiverId: readerId,
+      status: {
+        not: 'READ',
+      },
+    },
+  });
+
   if (io) {
     io.to(`session:chat:${sessionId}`).emit('chat_read', {
       sessionId,
       readerId,
       updatedCount: updated.count,
       messageIds,
+      unreadCount,
     });
   }
 
-  return updated;
+  return {
+    sessionId,
+    readerId,
+    updatedCount: updated.count,
+    count: updated.count,
+    unreadCount,
+    messageIds: Array.isArray(messageIds) ? messageIds : [],
+  };
 };
 
 const reportUserInChat = async ({ reporterId, sessionId, reportedUserId, reason }) => {

@@ -1,5 +1,4 @@
 const express = require('express');
-const path = require('path');
 const helmet = require('helmet');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -59,6 +58,9 @@ app.get('/health', (_req, res) => {
   res.status(200).json({
     success: true,
     message: 'Server is healthy',
+    appVersion: env.APP_VERSION,
+    firebaseStorageConfigured: Boolean(String(env.FIREBASE_STORAGE_BUCKET || '').trim()),
+    revision: process.env.K_REVISION || null,
     uptimeSeconds: Number(process.uptime().toFixed(0)),
     timestamp: new Date().toISOString(),
   });
@@ -72,7 +74,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(sanitizeInputMiddleware);
 app.use(globalRateLimiter);
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
 
 const apiPrefixes = Array.from(new Set([env.API_PREFIX, '/api/v1', '/api'].filter(Boolean)));
 apiPrefixes.forEach((prefix) => {

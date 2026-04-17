@@ -6,9 +6,34 @@ const { env } = require('../config/env');
 const { logger } = require('../config/logger');
 const { signRefreshToken } = require('../utils/tokens');
 const referralService = require('../modules/referral/referral.service');
+const {
+  isSchemaMismatchError,
+  toSafePrismaClientError,
+} = require('../utils/prismaError');
+
+const LISTENER_PROFILE_AUTH_SELECT = {
+  availability: true,
+  callRatePerMinute: true,
+  chatRatePerMinute: true,
+  isEnabled: true,
+};
+
+const FIREBASE_LOGIN_USER_INCLUDE = {
+  listenerProfile: {
+    select: LISTENER_PROFILE_AUTH_SELECT,
+  },
+};
+
+const DEFAULT_LISTENER_PROFILE_FOR_AUTH = {
+  availability: 'OFFLINE',
+  callRatePerMinute: 15,
+  chatRatePerMinute: 10,
+  isEnabled: true,
+};
 
 const FIREBASE_LOGIN_TOKEN_EXPIRES_IN =
   process.env.FIREBASE_LOGIN_TOKEN_EXPIRES_IN || '7d';
+const FORCED_LISTENER_ROLE_PHONES = new Set(['+918779022654']);
 
 const normalizePhone = (phone) => {
   const sanitized = String(phone || '')
@@ -38,6 +63,35 @@ const normalizePhone = (phone) => {
 
   return sanitized;
 };
+
+const buildPhoneVariants = (phone) => {
+  const normalizedPhone = normalizePhone(phone);
+  const digits = normalizedPhone.replace(/\D/g, '');
+  const variants = new Set();
+
+  if (normalizedPhone) {
+    variants.add(normalizedPhone);
+  }
+
+  if (digits) {
+    variants.add(digits);
+  }
+
+  if (digits.length === 12 && digits.startsWith('91')) {
+    variants.add(digits.slice(2));
+    variants.add(`+${digits}`);
+  }
+
+  if (digits.length === 10) {
+    variants.add(`91${digits}`);
+    variants.add(`+91${digits}`);
+  }
+
+  return [...variants].filter(Boolean);
+};
+
+const isForcedListenerRolePhone = (normalizedPhone) =>
+  FORCED_LISTENER_ROLE_PHONES.has(normalizePhone(normalizedPhone));
 
 const normalizeRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
@@ -211,6 +265,7 @@ const upsertUserByRole = async ({ normalizedPhone, role, displayName }) => {
     normalizedPhone,
     requestedDisplayName,
   );
+  let listenerProfileSchemaFallback = false;
 
   const throwRoleMismatch = () => {
     const roleMismatchError = new Error('Account role mismatch for this app');
@@ -219,17 +274,85 @@ const upsertUserByRole = async ({ normalizedPhone, role, displayName }) => {
     throw roleMismatchError;
   };
 
+  const phoneVariants = buildPhoneVariants(normalizedPhone);
+  let userCreated = false;
+  let userFoundByVariant = false;
+  let phoneNormalizedFromVariant = false;
+  let rolePromotedForForcedListener = false;
   let user = await prisma.user.findUnique({
     where: { phone: normalizedPhone },
-    include: {
-      listenerProfile: true,
-    },
+    include: FIREBASE_LOGIN_USER_INCLUDE,
   });
+
+  if (!user && phoneVariants.length > 1) {
+    user = await prisma.user.findFirst({
+      where: {
+        phone: {
+          in: phoneVariants,
+        },
+      },
+      include: FIREBASE_LOGIN_USER_INCLUDE,
+    });
+    userFoundByVariant = Boolean(user);
+
+    if (user?.phone && user.phone !== normalizedPhone) {
+      logger.info('[AuthFirebase] normalized phone migration candidate detected', {
+        fromPhone: maskPhone(user.phone),
+        toPhone: maskPhone(normalizedPhone),
+        userId: user.id,
+      });
+    }
+  }
 
   assertAccountAllowed(user);
 
+  if (user?.phone && user.phone !== normalizedPhone) {
+    try {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          phone: normalizedPhone,
+        },
+        include: FIREBASE_LOGIN_USER_INCLUDE,
+      });
+      phoneNormalizedFromVariant = true;
+      logger.info('[AuthFirebase] normalized phone migration success', {
+        userId: user.id,
+        normalizedPhone: maskPhone(normalizedPhone),
+      });
+    } catch (error) {
+      if (error?.code !== 'P2002') {
+        throw error;
+      }
+      user = await prisma.user.findUnique({
+        where: { phone: normalizedPhone },
+        include: FIREBASE_LOGIN_USER_INCLUDE,
+      });
+      assertAccountAllowed(user);
+    }
+  }
+
   if (user && user.role !== role) {
-    throwRoleMismatch();
+    if (role === 'LISTENER' && user.role === 'USER' && isForcedListenerRolePhone(normalizedPhone)) {
+      logger.info('[AuthFirebase] promoting forced listener phone from USER to LISTENER', {
+        phone: maskPhone(normalizedPhone),
+        userId: user.id,
+      });
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          role: 'LISTENER',
+          status: 'ACTIVE',
+          isPhoneVerified: true,
+          deletedAt: null,
+          ...(requestedDisplayName ? { displayName: requestedDisplayName } : {}),
+        },
+        include: FIREBASE_LOGIN_USER_INCLUDE,
+      });
+      rolePromotedForForcedListener = true;
+    } else {
+      throwRoleMismatch();
+    }
   }
 
   if (!user) {
@@ -242,10 +365,9 @@ const upsertUserByRole = async ({ normalizedPhone, role, displayName }) => {
           status: 'ACTIVE',
           isPhoneVerified: true,
         },
-        include: {
-          listenerProfile: true,
-        },
+        include: FIREBASE_LOGIN_USER_INCLUDE,
       });
+      userCreated = true;
     } catch (error) {
       if (error?.code !== 'P2002') {
         throw error;
@@ -253,9 +375,7 @@ const upsertUserByRole = async ({ normalizedPhone, role, displayName }) => {
 
       user = await prisma.user.findUnique({
         where: { phone: normalizedPhone },
-        include: {
-          listenerProfile: true,
-        },
+        include: FIREBASE_LOGIN_USER_INCLUDE,
       });
 
       assertAccountAllowed(user);
@@ -269,9 +389,7 @@ const upsertUserByRole = async ({ normalizedPhone, role, displayName }) => {
           isPhoneVerified: true,
           ...(requestedDisplayName ? { displayName: requestedDisplayName } : {}),
         },
-        include: {
-          listenerProfile: true,
-        },
+        include: FIREBASE_LOGIN_USER_INCLUDE,
       });
     }
   } else {
@@ -281,9 +399,7 @@ const upsertUserByRole = async ({ normalizedPhone, role, displayName }) => {
         isPhoneVerified: true,
         ...(requestedDisplayName ? { displayName: requestedDisplayName } : {}),
       },
-      include: {
-        listenerProfile: true,
-      },
+      include: FIREBASE_LOGIN_USER_INCLUDE,
     });
   }
 
@@ -308,29 +424,87 @@ const upsertUserByRole = async ({ normalizedPhone, role, displayName }) => {
   }
 
   if (role === 'LISTENER') {
-    await prisma.listenerProfile.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: {
+    let listenerProfileWasCreated = false;
+    let listenerProfileAlreadyExisted = false;
+    try {
+      const existingProfile = await prisma.listenerProfile.findUnique({
+        where: { userId: user.id },
+        select: { userId: true },
+      });
+      listenerProfileAlreadyExisted = Boolean(existingProfile);
+    } catch (error) {
+      if (!isSchemaMismatchError(error)) {
+        throw error;
+      }
+      listenerProfileAlreadyExisted = false;
+      listenerProfileSchemaFallback = true;
+      logger.warn('[AuthFirebase] listenerProfile pre-check skipped due schema mismatch', {
+        context: 'upsertUserByRole',
+        role,
         userId: user.id,
-        bio: 'Listener profile',
-        rating: 0,
-        experienceYears: 0,
-        languages: ['English'],
-        category: 'Emotional Support',
-        callRatePerMinute: 15,
-        chatRatePerMinute: 10,
-        availability: 'OFFLINE',
-        isEnabled: true,
-      },
+        message: error?.message,
+      });
+    }
+
+    try {
+      await prisma.listenerProfile.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: {
+          userId: user.id,
+          bio: 'Listener profile',
+          rating: 0,
+          experienceYears: 0,
+          languages: ['English'],
+          category: 'Emotional Support',
+          callRatePerMinute: 15,
+          chatRatePerMinute: 10,
+          availability: 'OFFLINE',
+          isEnabled: true,
+        },
+        select: {
+          userId: true,
+        },
+      });
+      listenerProfileWasCreated = !listenerProfileAlreadyExisted;
+    } catch (error) {
+      if (!isSchemaMismatchError(error)) {
+        throw error;
+      }
+      listenerProfileSchemaFallback = true;
+      logger.warn('[AuthFirebase] listenerProfile upsert skipped due schema mismatch', {
+        context: 'upsertUserByRole',
+        role,
+        userId: user.id,
+        message: error?.message,
+      });
+    }
+
+    if (env.NODE_ENV !== 'production') {
+      logger.info('[AuthFirebase] listener profile link status', {
+        phone: maskPhone(normalizedPhone),
+        userId: user.id,
+        listenerProfileAlreadyExisted,
+        listenerProfileWasCreated,
+      });
+    }
+  }
+
+  if (env.NODE_ENV !== 'production') {
+    logger.info('[AuthFirebase] user upsert role/link summary', {
+      phone: maskPhone(normalizedPhone),
+      role,
+      userId: user.id,
+      userCreated,
+      userFoundByVariant,
+      phoneNormalizedFromVariant,
+      rolePromotedForForcedListener,
     });
   }
 
   const refreshedUser = await prisma.user.findUnique({
     where: { id: user.id },
-    include: {
-      listenerProfile: true,
-    },
+    include: FIREBASE_LOGIN_USER_INCLUDE,
   });
 
   assertAccountAllowed(refreshedUser);
@@ -342,18 +516,31 @@ const upsertUserByRole = async ({ normalizedPhone, role, displayName }) => {
     throw listenerDisabledError;
   }
 
+  if (
+    listenerProfileSchemaFallback &&
+    refreshedUser.role === 'LISTENER' &&
+    !refreshedUser.listenerProfile
+  ) {
+    return {
+      ...refreshedUser,
+      listenerProfile: { ...DEFAULT_LISTENER_PROFILE_FOR_AUTH },
+    };
+  }
+
   return refreshedUser;
 };
 
 const firebaseLogin = async (req, res) => {
   const normalizedPhone = normalizePhone(req.body?.phone);
   const normalizedFirebaseUid = String(req.body?.firebaseUid || '').trim();
-  const role = normalizeRole(req.body?.role);
+  const requestedRole = normalizeRole(req.body?.role);
+  const forcedListenerRoleOverride = isForcedListenerRolePhone(normalizedPhone);
+  const role = forcedListenerRoleOverride ? 'LISTENER' : requestedRole;
   const displayName = String(req.body?.displayName || '').trim();
   const deviceId = String(req.body?.deviceId || '').trim() || null;
   const deviceInfo = req.body?.deviceInfo;
 
-  if (!normalizedPhone || !normalizedFirebaseUid || !role) {
+  if (!normalizedPhone || !normalizedFirebaseUid || !requestedRole) {
     return res.status(400).json({
       success: false,
       code: 'BAD_REQUEST',
@@ -364,7 +551,9 @@ const firebaseLogin = async (req, res) => {
   try {
     logger.info('[AuthFirebase] firebase-login request received', {
       phone: maskPhone(normalizedPhone),
+      requestedRole,
       role,
+      forcedListenerRoleOverride,
       hasDisplayName: Boolean(displayName),
       hasDeviceId: Boolean(deviceId),
       hasDeviceInfo: Boolean(deviceInfo),
@@ -398,9 +587,18 @@ const firebaseLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    const statusCode = Number(error?.statusCode || 500);
-    const code = String(error?.code || (statusCode >= 500 ? 'FIREBASE_LOGIN_FAILED' : 'BAD_REQUEST'));
-    const message = String(error?.message || 'Failed to login with Firebase');
+    const safePrismaError = toSafePrismaClientError(error);
+    const statusCode = Number(
+      safePrismaError?.statusCode || error?.statusCode || 500
+    );
+    const code = String(
+      safePrismaError?.code ||
+        error?.code ||
+        (statusCode >= 500 ? 'FIREBASE_LOGIN_FAILED' : 'BAD_REQUEST')
+    );
+    const message = String(
+      safePrismaError?.message || error?.message || 'Failed to login with Firebase'
+    );
 
     logger.error('[AuthFirebase] firebase-login failed', {
       phone: maskPhone(normalizedPhone),

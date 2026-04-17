@@ -59,7 +59,7 @@ const envSchema = z.object({
     .default('false')
     .transform((value) => value.toLowerCase() === 'true'),
 
-  PAYMENT_PROVIDER: z.enum(['mock', 'razorpay', 'stripe']).default('mock'),
+  PAYMENT_PROVIDER: z.enum(['mock', 'manual', 'razorpay', 'stripe']).default('mock'),
   PAYMENT_WEBHOOK_SECRET: z.string().default('webhook-secret'),
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
@@ -73,7 +73,9 @@ const envSchema = z.object({
     .default('true')
     .transform((value) => value.toLowerCase() === 'true'),
   EXPO_PUSH_ACCESS_TOKEN: z.string().optional(),
-  PROFILE_IMAGE_PUBLIC_BASE_URL: z.string().optional(),
+  FIREBASE_STORAGE_BUCKET: z.string().default(''),
+  FIREBASE_STORAGE_CACHE_CONTROL: z.string().default('public, max-age=31536000'),
+  GCP_PROJECT_ID: z.string().optional(),
 
   MIN_CHAT_START_BALANCE: z.coerce.number().default(20),
   MIN_CALL_START_BALANCE: z.coerce.number().default(30),
@@ -99,11 +101,20 @@ if (!parsed.success) {
   throw new Error(`Invalid environment variables:\n${messages.join('\n')}`);
 }
 
-const env = parsed.data;
+const env = {
+  ...parsed.data,
+  AGORA_ENABLED: Boolean(parsed.data.AGORA_APP_ID && parsed.data.AGORA_APP_CERTIFICATE),
+};
 
-if (!env.AGORA_APP_ID || !env.AGORA_APP_CERTIFICATE) {
-  throw new Error(
-    'Missing Agora configuration. Please set AGORA_APP_ID and AGORA_APP_CERTIFICATE.'
+if (!env.AGORA_ENABLED) {
+  console.warn(
+    '[env] AGORA_APP_ID / AGORA_APP_CERTIFICATE not configured. Call token routes will be unavailable until set.'
+  );
+}
+
+if (!env.FIREBASE_STORAGE_BUCKET) {
+  console.warn(
+    '[env] FIREBASE_STORAGE_BUCKET is not configured. Upload endpoints will fail until set.'
   );
 }
 

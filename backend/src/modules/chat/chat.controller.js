@@ -90,6 +90,16 @@ const sendMessage = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Message sent');
 });
 
+const markRead = asyncHandler(async (req, res) => {
+  const data = await chatService.markRead({
+    sessionId: req.params.sessionId,
+    readerId: req.user.id,
+    messageIds: req.body.messageIds,
+  });
+
+  return successResponse(res, data, 'Messages marked as read');
+});
+
 const reportUser = asyncHandler(async (req, res) => {
   const data = await chatService.reportUserInChat({
     reporterId: req.user.id,
@@ -121,5 +131,6 @@ module.exports = {
   getSessions,
   getMessages,
   sendMessage,
+  markRead,
   reportUser,
 };

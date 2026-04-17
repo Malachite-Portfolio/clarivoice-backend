@@ -4,6 +4,13 @@ const { logger } = require('../config/logger');
 const { verifyAccessToken } = require('../utils/tokens');
 const { AppError } = require('../utils/appError');
 
+const AUTH_LISTENER_PROFILE_SELECT = {
+  availability: true,
+  callRatePerMinute: true,
+  chatRatePerMinute: true,
+  isEnabled: true,
+};
+
 const authMiddleware = async (req, _res, next) => {
   const authHeader = req.headers.authorization;
 
@@ -22,7 +29,12 @@ const authMiddleware = async (req, _res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      include: { listenerProfile: true, wallet: true },
+      include: {
+        listenerProfile: {
+          select: AUTH_LISTENER_PROFILE_SELECT,
+        },
+        wallet: true,
+      },
     });
 
     if (!user) {

@@ -12,6 +12,13 @@ const MIN_WITHDRAWAL_AMOUNT = Number.isFinite(configuredMinWithdrawalAmount)
   : 5000;
 const WITHDRAWAL_SUBJECT_PREFIX = 'Withdrawal Request';
 const WITHDRAWAL_MESSAGE_PREFIX = '[withdrawal]';
+const KYC_APPROVED_STATUS = 'APPROVED';
+const KYC_GATE_MESSAGES = {
+  NOT_STARTED: 'Complete KYC to continue.',
+  DRAFT: 'Finish your verification.',
+  PENDING: 'Your KYC is under review.',
+  REJECTED: 'Your KYC was rejected. Update details and resubmit.',
+};
 
 const normalizeNote = (value) => String(value || '').trim();
 
@@ -55,6 +62,51 @@ const parseWithdrawalPayload = (message = '') => {
   } catch (_error) {
     return null;
   }
+};
+
+const resolveKycStatusForListener = (kycVerification) => {
+  if (!kycVerification) {
+    return 'NOT_STARTED';
+  }
+
+  const normalized = String(kycVerification.status || '').trim().toUpperCase();
+  if (
+    normalized === 'DRAFT' ||
+    normalized === 'PENDING' ||
+    normalized === 'APPROVED' ||
+    normalized === 'REJECTED'
+  ) {
+    return normalized;
+  }
+
+  return 'DRAFT';
+};
+
+const buildWithdrawalKycGate = (kycVerification) => {
+  const kycStatus = resolveKycStatusForListener(kycVerification);
+  if (kycStatus === KYC_APPROVED_STATUS) {
+    return null;
+  }
+
+  if (kycStatus === 'REJECTED') {
+    const note = String(kycVerification?.reviewNote || '').trim();
+    return {
+      kycStatus,
+      reasonCode: 'KYC_REJECTED',
+      reason: note ? `${KYC_GATE_MESSAGES.REJECTED} ${note}` : KYC_GATE_MESSAGES.REJECTED,
+    };
+  }
+
+  return {
+    kycStatus,
+    reasonCode:
+      kycStatus === 'PENDING'
+        ? 'KYC_PENDING'
+        : kycStatus === 'DRAFT'
+        ? 'KYC_DRAFT'
+        : 'KYC_NOT_STARTED',
+    reason: KYC_GATE_MESSAGES[kycStatus] || KYC_GATE_MESSAGES.NOT_STARTED,
+  };
 };
 
 const evaluateCoupon = async ({ couponCode, amount }) => {
@@ -147,6 +199,13 @@ const getWithdrawalConfig = async (userId) => {
         role: true,
         phone: true,
         email: true,
+        kycVerification: {
+          select: {
+            id: true,
+            status: true,
+            reviewNote: true,
+          },
+        },
       },
     }),
     walletLedgerService.getWalletByUserId(userId),
@@ -168,6 +227,22 @@ const getWithdrawalConfig = async (userId) => {
       hasPayoutMethod: false,
       payoutCta: 'Switch to host account to request withdrawal.',
       pendingRequest: null,
+    };
+  }
+
+  const kycGate = buildWithdrawalKycGate(user.kycVerification);
+  if (kycGate) {
+    return {
+      enabled: false,
+      minimumAmount: MIN_WITHDRAWAL_AMOUNT,
+      currentBalance: toNumber(wallet?.balance || 0),
+      currency: wallet?.currency || 'INR',
+      reasonCode: kycGate.reasonCode,
+      reason: kycGate.reason,
+      hasPayoutMethod: false,
+      payoutCta: kycGate.reason,
+      pendingRequest: null,
+      kycStatus: kycGate.kycStatus,
     };
   }
 

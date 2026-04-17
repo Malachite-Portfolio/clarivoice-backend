@@ -1,5 +1,6 @@
 const { asyncHandler } = require('../../utils/asyncHandler');
 const { successResponse } = require('../../utils/apiResponse');
+const { env } = require('../../config/env');
 const profileService = require('./profile.service');
 
 const getMe = asyncHandler(async (req, res) => {
@@ -13,10 +14,15 @@ const patchMe = asyncHandler(async (req, res) => {
 });
 
 const uploadAvatar = asyncHandler(async (req, res) => {
-  console.log('[Profile] avatarUploadStart', {
+  console.info('[Profile] upload route hit', {
+    route: req?.originalUrl || req?.url || null,
+    hasAuthorizationHeader: Boolean(req?.headers?.authorization),
     userId: req?.user?.id || null,
+    role: req?.user?.role || null,
+    fileName: req?.file?.originalname || null,
     mimeType: req?.file?.mimetype || null,
     fileSize: Number(req?.file?.size || 0) || null,
+    firebaseStorageBucket: String(env?.FIREBASE_STORAGE_BUCKET || '').trim() || null,
   });
 
   const data = await profileService.uploadProfileAvatar(req.user.id, req.file, {
@@ -30,7 +36,7 @@ const uploadAvatar = asyncHandler(async (req, res) => {
       '',
   });
 
-  console.log('[Profile] avatarUploadSuccess', {
+  console.info('[Profile] avatar upload success', {
     userId: req?.user?.id || null,
     profileImageUrl: data?.profileImageUrl || null,
   });

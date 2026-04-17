@@ -93,9 +93,29 @@ const assertCallParticipant = (session, userId) => {
 };
 
 const setListenerOnline = async (listenerId, reason) => {
+  const listenerState = await prisma.listenerProfile.findUnique({
+    where: { userId: listenerId },
+    select: {
+      user: {
+        select: {
+          kycVerification: {
+            select: {
+              status: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const normalizedKycStatus = String(listenerState?.user?.kycVerification?.status || '')
+    .trim()
+    .toUpperCase();
+  const nextAvailability = normalizedKycStatus === 'APPROVED' ? 'ONLINE' : 'OFFLINE';
+
   await prisma.listenerProfile.updateMany({
     where: { userId: listenerId },
-    data: { availability: 'ONLINE' },
+    data: { availability: nextAvailability },
   });
 
   const listenerProfile = await prisma.listenerProfile.findUnique({
@@ -105,11 +125,11 @@ const setListenerOnline = async (listenerId, reason) => {
 
   emitHostStatusChanged({
     listenerId,
-    status: listenerProfile?.availability || 'ONLINE',
-    availability: listenerProfile?.availability || 'ONLINE',
+    status: listenerProfile?.availability || nextAvailability,
+    availability: listenerProfile?.availability || nextAvailability,
     isEnabled: listenerProfile?.isEnabled ?? true,
     updatedAt: listenerProfile?.updatedAt || null,
-    reason,
+    reason: nextAvailability === 'ONLINE' ? reason : 'KYC_APPROVAL_REQUIRED',
   });
 };
 

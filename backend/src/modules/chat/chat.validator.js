@@ -32,6 +32,10 @@ const chatReportSchema = z.object({
   reason: z.string().trim().min(4).max(1000),
 });
 
+const chatMarkReadSchema = z.object({
+  messageIds: z.array(z.string().min(10)).max(500).optional(),
+});
+
 const chatSessionsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -46,5 +50,6 @@ module.exports = {
   chatTokenRefreshSchema,
   chatSendMessageSchema,
   chatReportSchema,
+  chatMarkReadSchema,
   chatSessionsQuerySchema,
 };

@@ -14,6 +14,16 @@ const assertValidChannelName = (channelName) => {
   }
 };
 
+const assertAgoraConfigured = () => {
+  if (!env.AGORA_APP_ID || !env.AGORA_APP_CERTIFICATE) {
+    throw new AppError(
+      'Realtime call service is temporarily unavailable.',
+      503,
+      'AGORA_NOT_CONFIGURED'
+    );
+  }
+};
+
 const toAgoraUid = (userId) => {
   // Agora Android SDK expects a positive 32-bit int uid (commonly treated as signed).
   // Keep UIDs within 1..2,147,483,647 to avoid native overflow issues that can surface as join rejections.
@@ -70,6 +80,7 @@ const generateRtcToken = ({
   role = 'publisher',
   expirySeconds = DEFAULT_EXPIRY_SECONDS,
 }) => {
+  assertAgoraConfigured();
   assertValidChannelName(channelName);
 
   const uid = toAgoraUid(userId);
@@ -100,6 +111,7 @@ const generateRtcToken = ({
 };
 
 const generateChatToken = ({ userId, expirySeconds = DEFAULT_EXPIRY_SECONDS }) => {
+  assertAgoraConfigured();
   const account = String(userId || '').trim();
   if (!account) {
     throw new AppError('Invalid Agora chat account', 400, 'INVALID_AGORA_CHAT_ACCOUNT');

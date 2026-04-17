@@ -6,6 +6,27 @@ const { logger } = require('../../config/logger');
 const { AppError } = require('../../utils/appError');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../../utils/tokens');
 const { buildReferralCode } = require('../../utils/referralCode');
+const { isSchemaMismatchError } = require('../../utils/prismaError');
+
+const LISTENER_PROFILE_AUTH_SELECT = {
+  availability: true,
+  callRatePerMinute: true,
+  chatRatePerMinute: true,
+  isEnabled: true,
+};
+
+const AUTH_USER_INCLUDE = {
+  listenerProfile: {
+    select: LISTENER_PROFILE_AUTH_SELECT,
+  },
+};
+
+const DEFAULT_LISTENER_PROFILE_FOR_AUTH = {
+  availability: 'OFFLINE',
+  callRatePerMinute: 15,
+  chatRatePerMinute: 10,
+  isEnabled: true,
+};
 
 const parseExpiryToDate = (expiresIn) => {
   const match = String(expiresIn).match(/^(\d+)([smhd])$/i);
@@ -78,9 +99,6 @@ const buildPhoneVariants = (phone) => {
 
   return [...variants].filter(Boolean);
 };
-const DEMO_LISTENER_ID = '000000101';
-const DEMO_LISTENER_PHONE = '+910000000101';
-const DEMO_LISTENER_PASSWORD = '12345678';
 const FIXED_TEST_USER_PHONES = Object.freeze([
   '+910000000201',
   '+910000000202',
@@ -250,96 +268,6 @@ const verifyOtpChallenge = async ({ normalizedPhone, purpose, otpRecord, otp }) 
   return otpRecord;
 };
 
-const buildDemoListenerAuthResponse = async ({ deviceId, deviceInfo, ipAddress, userAgent }) => {
-  const passwordHash = await bcrypt.hash(DEMO_LISTENER_PASSWORD, 10);
-
-  const listenerUser = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.upsert({
-      where: { phone: DEMO_LISTENER_PHONE },
-      update: {
-        role: 'LISTENER',
-        status: 'ACTIVE',
-        passwordHash,
-        displayName: 'Demo Listener',
-        isPhoneVerified: true,
-        deletedAt: null,
-      },
-      create: {
-        phone: DEMO_LISTENER_PHONE,
-        role: 'LISTENER',
-        status: 'ACTIVE',
-        passwordHash,
-        displayName: 'Demo Listener',
-        isPhoneVerified: true,
-      },
-    });
-
-    await tx.listenerProfile.upsert({
-      where: { userId: user.id },
-      update: {
-        availability: 'ONLINE',
-        isEnabled: true,
-      },
-      create: {
-        userId: user.id,
-        bio: 'Demo listener account',
-        rating: 4.9,
-        experienceYears: 3,
-        languages: ['English', 'Hindi'],
-        category: 'Emotional Support',
-        callRatePerMinute: 15,
-        chatRatePerMinute: 10,
-        availability: 'ONLINE',
-        isEnabled: true,
-      },
-    });
-
-    await tx.wallet.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: {
-        userId: user.id,
-        currency: 'INR',
-      },
-    });
-
-    return tx.user.findUnique({
-      where: { id: user.id },
-      include: { listenerProfile: true },
-    });
-  }, {
-    maxWait: 10000,
-    timeout: 20000,
-  });
-
-  const tokens = await issueTokensForSession({
-    user: listenerUser,
-    deviceId,
-    deviceInfo,
-    ipAddress,
-    userAgent,
-  });
-
-  return {
-    user: {
-      id: listenerUser.id,
-      phone: listenerUser.phone,
-      email: listenerUser.email,
-      displayName: listenerUser.displayName,
-      role: listenerUser.role,
-      status: listenerUser.status,
-      listenerProfile: {
-        availability: listenerUser.listenerProfile.availability,
-        callRatePerMinute: listenerUser.listenerProfile.callRatePerMinute,
-        chatRatePerMinute: listenerUser.listenerProfile.chatRatePerMinute,
-        isEnabled: listenerUser.listenerProfile.isEnabled,
-      },
-    },
-    ...tokens,
-    demoMode: true,
-  };
-};
-
 const issueTokensForSession = async ({ user, deviceId, deviceInfo, ipAddress, userAgent }) => {
   const accessToken = signAccessToken({
     sub: user.id,
@@ -497,11 +425,10 @@ const upsertOtpUser = async ({ normalizedPhone, displayName, otpRecordId }) => {
 
 const upsertOtpListenerUser = async ({ normalizedPhone, otpRecordId }) => {
   return prisma.$transaction(async (tx) => {
+    let listenerProfileSchemaFallback = false;
     let listenerUser = await tx.user.findUnique({
       where: { phone: normalizedPhone },
-      include: {
-        listenerProfile: true,
-      },
+      include: AUTH_USER_INCLUDE,
     });
 
     if (!listenerUser) {
@@ -513,9 +440,7 @@ const upsertOtpListenerUser = async ({ normalizedPhone, otpRecordId }) => {
           status: 'ACTIVE',
           isPhoneVerified: true,
         },
-        include: {
-          listenerProfile: true,
-        },
+        include: AUTH_USER_INCLUDE,
       });
     } else if (
       listenerUser.role !== 'LISTENER' ||
@@ -532,31 +457,43 @@ const upsertOtpListenerUser = async ({ normalizedPhone, otpRecordId }) => {
           isPhoneVerified: true,
           deletedAt: null,
         },
-        include: {
-          listenerProfile: true,
-        },
+        include: AUTH_USER_INCLUDE,
       });
     }
 
-    await tx.listenerProfile.upsert({
-      where: { userId: listenerUser.id },
-      update: {
-        availability: 'ONLINE',
-        isEnabled: true,
-      },
-      create: {
-        userId: listenerUser.id,
-        bio: 'Test listener account',
-        rating: 4.9,
-        experienceYears: 3,
-        languages: ['English', 'Hindi'],
-        category: 'Emotional Support',
-        callRatePerMinute: 15,
-        chatRatePerMinute: 10,
-        availability: 'ONLINE',
-        isEnabled: true,
-      },
-    });
+    try {
+      await tx.listenerProfile.upsert({
+        where: { userId: listenerUser.id },
+        update: {
+          availability: 'ONLINE',
+          isEnabled: true,
+        },
+        create: {
+          userId: listenerUser.id,
+          bio: 'Test listener account',
+          rating: 4.9,
+          experienceYears: 3,
+          languages: ['English', 'Hindi'],
+          category: 'Emotional Support',
+          callRatePerMinute: 15,
+          chatRatePerMinute: 10,
+          availability: 'ONLINE',
+          isEnabled: true,
+        },
+        select: {
+          userId: true,
+        },
+      });
+    } catch (error) {
+      if (!isSchemaMismatchError(error)) {
+        throw error;
+      }
+      listenerProfileSchemaFallback = true;
+      logger.warn('[Auth] listenerProfile upsert skipped due schema mismatch', {
+        context: 'upsertOtpListenerUser',
+        message: error?.message,
+      });
+    }
 
     await tx.wallet.upsert({
       where: { userId: listenerUser.id },
@@ -577,12 +514,17 @@ const upsertOtpListenerUser = async ({ normalizedPhone, otpRecordId }) => {
       });
     }
 
-    return tx.user.findUnique({
+    const refreshed = await tx.user.findUnique({
       where: { id: listenerUser.id },
-      include: {
-        listenerProfile: true,
-      },
+      include: AUTH_USER_INCLUDE,
     });
+    if (listenerProfileSchemaFallback && refreshed && !refreshed.listenerProfile) {
+      return {
+        ...refreshed,
+        listenerProfile: { ...DEFAULT_LISTENER_PROFILE_FOR_AUTH },
+      };
+    }
+    return refreshed;
   }, {
     maxWait: 10000,
     timeout: 20000,
@@ -898,19 +840,6 @@ const loginListenerWithPassword = async ({
     hasPassword: Boolean(password),
   });
 
-  if (
-    env.DEMO_LISTENER_LOGIN_BYPASS &&
-    rawIdentity === DEMO_LISTENER_ID &&
-    String(password || '') === DEMO_LISTENER_PASSWORD
-  ) {
-    return buildDemoListenerAuthResponse({
-      deviceId,
-      deviceInfo,
-      ipAddress,
-      userAgent,
-    });
-  }
-
   if (!rawIdentity) {
     throw new AppError(
       'Listener ID, phone, or email is required',
@@ -926,9 +855,7 @@ const loginListenerWithPassword = async ({
         role: 'LISTENER',
         OR: [{ id: rawIdentity }, { phone: normalizePhone(rawIdentity) }, { email: normalizedEmail }],
       },
-      include: {
-        listenerProfile: true,
-      },
+      include: AUTH_USER_INCLUDE,
     });
   } catch (error) {
     logger.error('[Auth] listener lookup failed', {
